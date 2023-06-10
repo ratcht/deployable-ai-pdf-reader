@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>AI PDF Reader</title>
+    <link rel="stylesheet" href="{{ url_for('static',filename='css/index.css') }}">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-KK94CHFLLe+nY2dmCWGMq91rCGa5gtU4mk92HdvYe+M/SXH301p5ILy+dN9+nJOZ" crossorigin="anonymous">
+    <script type="text/javascript" src="http://code.jquery.com/jquery.min.js">  </script>
+  </head>
+
+  <body>
+    <div class="container">
+      <!-- Content here -->
+      <div class="row" style="margin-top:5%;">
+        <div class="overflow-auto" style="height:400px; background-color: rgba(255,0,0,0.1); padding:2%;">
+          
+          <div id="chatLoader">
+
+          </div>
+          <p id="tempChat" class="promptRow"></p>
+        </div>
+      </div>
+      <div class="row">
+        <div class="mb-3">
+          <input type="text" class="form-control" id="chatInput">
+        </div>
+        <button type="submit" id="sendButton" class="btn btn-primary">Submit</button>
+      </div>
+      <div class="row" style="margin-top: 5%;">
+        <form method="POST" action="/upload" enctype="multipart/form-data">
+          <div class="container">
+            <div class="row">
+              <label for="pdf-file">PDF Upload</label>
+            </div>
+            <div class="row">
+              <div class="row">
+                <input type="file" name="file" accept=".pdf" style="width:20%;" required>
+              </div>
+
+              <div class="row">
+                <input type="submit" class="btn btn-primary" style="width:20%; margin-top:1%;" value="Upload!" >
+              </div>
+
+            </div>
+          </div>
+        </form>
+        
+      </div>
+      <div class="row" style="margin-top:4%;">
+        <a href="/upload/list" style="width:20%; background-color: orange;" class="btn btn-primary border-0">View uploaded files!</a>
+      </div>
+      <div class="row" style="margin-top:1%;">
+        <a href="/chat/clear" style="width:20%; background-color: greenyellow;" class="btn btn-primary border-0 float-right">Clear Chat!</a>
+      </div>
+    </div>
+
+
+    <script>
+      function loadChat() {
+        fetch("/chat/list", {
+          method:"GET"
+        }).then(response => {
+          return response.text();
+        }).then(html => {    
+          // Reset Temp Chat
+          document.getElementById("tempChat").innerHTML = "";
+
+          document.getElementById("chatLoader").innerHTML = html;
+        })
+      }
+        
+      $(function() {
+
+        //load chat
+        loadChat();
+
+        const button = document.getElementById("sendButton");
+        button.addEventListener("click", newChat);
+        
+        document.getElementById("chatInput")
+        .addEventListener("keyup", function(event) {
+        event.preventDefault();
+          if (event.keyCode === 13) {
+            button.click();
+          }
+        });
+
+        
+
+        function getChatHTML() {
+
+        }
+
+        function newChat() {
+          // Get Input box value
+          const chatInput = document.getElementById("chatInput").value
+
+          if (chatInput.length == 0) return;
+
+          // Clear inputBox
+          document.getElementById("chatInput").value = ""
+
+
+          // Update Temp Chat
+          document.getElementById("tempChat").innerHTML = chatInput;
+
+          fetch("/chat", {
+            method:"POST",
+            headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(chatInput)
+          })
+          .then(response => response.json())
+          .then((status)=>{
+            // handle errors here
+            console.log(status)
+            if (status.status_code != 200){
+              window.location.replace('/error');
+              return;
+            }
+
+            fetch("/chat/list", {
+              method:"GET"
+            }).then(response => {
+              return response.text();
+            }).then(html => {    
+              // Reset Temp Chat
+              document.getElementById("tempChat").innerHTML = "";
+
+              document.getElementById("chatLoader").innerHTML = html;
+            })
+          })
+
+          //AJAX Request
+
+          // -> Start load animation
+          /*
+          $.ajax({
+					type: "POST",
+					url: "/chat",
+					contentType: "application/json",
+					dataType: "JSON",
+					data: JSON.stringify(chatInput),
+					success: function(data, textStatus) {
+						// -> End load animation
+            console.log(data);
+            document.getElementById("replaceThis").innerHTML =  data;
+					}
+				});*/
+        }
+
+      });
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha3/dist/js/bootstrap.bundle.min.js" integrity="sha384-ENjdO4Dr2bkBIFxQpeoTz1HIcje39Wm4jDKdf19U8gI4ddQ3GYNS7NTKfAdVQSZe" crossorigin="anonymous"></script>
+  </body>
+
+
+</html>

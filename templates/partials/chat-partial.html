@@ -1,0 +1,4 @@
+{% for chat_obj in loaded_chat %}
+  <p class="promptRow">{{chat_obj.prompt}}</p>
+  <p class="responseRow">{{chat_obj.response}}</p>
+{% endfor %}

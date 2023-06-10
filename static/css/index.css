@@ -1,0 +1,10 @@
+.promptRow{
+  text-align: left;
+}
+
+.responseRow{
+  color: #6e6e6e;
+  text-align: center;
+  margin-left: 5%;
+  margin-right: 5%;
+}
