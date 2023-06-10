@@ -13,9 +13,15 @@ def read_pdf(file_path: str) -> list:
     chunks.append(page.extract_text())
   return chunks
 
+def read_pdf_from_file(file) -> list:
+  reader = PdfReader(file)
+  chunks = []
+  for page in reader.pages:
+    chunks.append(page.extract_text())
+  return chunks
 
 # process embeddings
-def create_df(chunks: list, batch_size = 1000) -> pd.DataFrame:
+def create_df(chunks: list, title: str, batch_size = 1000) -> pd.DataFrame:
   embeddings = []
   for batch_start in range(0, len(chunks), batch_size):
     batch_end = batch_start + batch_size
@@ -27,7 +33,8 @@ def create_df(chunks: list, batch_size = 1000) -> pd.DataFrame:
     batch_embeddings = [e["embedding"] for e in response["data"]]
     embeddings.extend(batch_embeddings)
 
-  df = pd.DataFrame({"text": chunks, "embedding": embeddings})
+  titles = [title for i in range(len(embeddings))]
+  df = pd.DataFrame({"text": chunks, "embedding": embeddings, "title": titles})
   return df
 
 
@@ -42,7 +49,6 @@ def get_pinecone_index(API_KEY, ENVIRONMENT, INDEX) -> pinecone.Index:
 
 
 def upload_to_pinecone(df: pd.DataFrame, pinecone_index: pinecone.Index, batch_size: int = 32):
-  df['embedding'] = df['embedding'].apply(ast.literal_eval)
 
   for batch_start in range(0, len(df.index), batch_size):
     batch_end = batch_start + batch_size

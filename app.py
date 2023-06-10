@@ -2,14 +2,14 @@ import openai
 from flask import Flask, redirect, url_for, render_template, request, session, after_this_request
 from files.python.api import authenticate
 from files.python.params import OPENAI_API_KEY, ACCEPTED_FILE_TYPES, UPLOAD_FOLDER_PATH, INDEX_JSON_FILE_PATH, PINECONE_API_KEY, ENVIRONMENT, INDEX
-from files.python.datahandler import read_pdf, create_df, upload_to_pinecone, get_pinecone_index
+from files.python.datahandler import read_pdf, read_pdf_from_file, create_df, upload_to_pinecone, get_pinecone_index
 from files.python.ask import ask
 from files.python.obj.chat import ChatObj, parse_chat
 from files.python.obj.error import StatusObj, parse_status
 import json
 import pandas as pd
+import ast
 import os
-from dotenv import load_dotenv
 import logging
 from werkzeug.utils import secure_filename
 
@@ -58,36 +58,23 @@ def upload_file():
   if not (file and is_file_allowed(file.filename)):
     session["error"] = json.dumps(StatusObj(400, "File input was invalid!"), cls=ComplexEncoder)
     return redirect(url_for('error'))
-
-
-  try:
-    filename = secure_filename(file.filename)
-    filepath = os.path.join(script_dir, UPLOAD_FOLDER_PATH, filename)
-    print(f"File Path: {filepath}")
-    file.save(filepath)
-    print("Saved to upload folder!")
-  except IOError as io:
-    session["error"] = json.dumps(StatusObj(400, f"Something went wrong when reading/writing to the file... {io}"), cls=ComplexEncoder)
-    return redirect(url_for('error'))
   
   try:
-    # embed file and store as csv
-    chunks = read_pdf(filepath)
-    df = create_df(chunks)
+    # embed file and store on pinecone
+    chunks = read_pdf_from_file(file)
+    df = create_df(chunks, file.filename)
     upload_to_pinecone(df, pinecone_index)
+
+
   except (openai.error.APIError, openai.error.InvalidRequestError, openai.error.Timeout) as oe:
     session["error"] = json.dumps(StatusObj(400, f"Something went wrong with the file when passing to OpenAI... {oe}"), cls=ComplexEncoder)
     return redirect(url_for('error'))
   except Exception as e:
     session["error"] = json.dumps(StatusObj(400, f"Something went wrong... {e}"), cls=ComplexEncoder)
   finally:
-    # clear upload folder
-    @after_this_request
-    def remove_file(response):
-      print('After request ...')
-      os.remove(filepath)
-      return response
+    logger.info("After Upload...")
     return redirect(url_for('error'))
+
 
 @app.route("/upload/list", methods=["GET"])
 def upload_list():
@@ -103,7 +90,7 @@ def chat():
 
   # Send chat to GPT
   try:
-    chat_response = ask(chat_input)
+    chat_response = ask(chat_input, pinecone_index)
   except Exception as e:
     session["error"] = json.dumps(StatusObj(500, f"Something happened! Please retry. Exception: {e}"), cls=ComplexEncoder)
     return session["error"]
@@ -170,6 +157,8 @@ if __name__ == "__main__":
   print(f"script_dir: {script_dir}")
 
   app.config["UPLOAD_FOLDER"] = os.path.join(script_dir, UPLOAD_FOLDER_PATH)
+  app.config["SESSION_TYPE"] = 'filesystem'
+
 
   # run app
   app.run(port=5000)
