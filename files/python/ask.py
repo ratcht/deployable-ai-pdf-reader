@@ -3,7 +3,8 @@ from files.python.params import GPT_MODEL, EMBEDDING_MODEL
 import logging
 import pinecone
 
-
+handle = "ask.py"
+logger = logging.getLogger(handle)
 
 def rank_strings_pinecone(
   query: str,
@@ -33,7 +34,7 @@ def rank_strings_pinecone(
 def create_query(query: str, pinecone_index: pinecone.Index, model: str, token_budget: int):
   """Return a message for GPT, with relevant source texts pulled from a dataframe."""
   strings, relatednesses, titles = rank_strings_pinecone(query, pinecone_index, top_n=3)
-  print("Finished ranking strings")
+  logger.info("Finished ranking strings")
 
   introduction = 'Use the below information, including the title of the document, to answer the subsequent question. Paraphrase and reword the information in the document for clarity, but do not change any facts. Do not give answers that are too long. If the answer cannot be found in the information, write "I could not find an answer."'
   question = f"\n\nQuestion: {query}"

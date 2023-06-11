@@ -1,14 +1,12 @@
 import openai
 from flask import Flask, redirect, url_for, render_template, request, session, after_this_request
 from files.python.api import authenticate
-from files.python.params import OPENAI_API_KEY, ACCEPTED_FILE_TYPES, UPLOAD_FOLDER_PATH, INDEX_JSON_FILE_PATH, PINECONE_API_KEY, ENVIRONMENT, INDEX
 from files.python.datahandler import read_pdf, read_pdf_from_file, create_df, upload_to_pinecone, get_pinecone_index
 from files.python.ask import ask
 from files.python.obj.chat import ChatObj, parse_chat
 from files.python.obj.error import StatusObj, parse_status
 import json
 import pandas as pd
-import ast
 import os
 import logging
 from werkzeug.utils import secure_filename
@@ -39,7 +37,7 @@ app.secret_key = "admin"
 
 def is_file_allowed(filename):
   file_extension = filename.rsplit('.', 1)[1]
-  print(f"File Extension: {file_extension}")
+  logger.info(f"File Extension: {file_extension}")
   return file_extension in ACCEPTED_FILE_TYPES 
 
 
@@ -111,12 +109,12 @@ def chat():
 
 @app.route("/chat/list", methods=["GET"])
 def chat_list():
-  print(f'Chat: {session["chat"]}')
+  logger.info(f'Chat: {session["chat"]}')
   return render_template("partials/chat-partial.html", loaded_chat=parse_chat(json.loads(session["chat"])))
 
 @app.route("/chat/clear", methods=["GET"])
 def clear_chat():
-  print("Chat cleared!")
+  logger.info("Chat cleared!")
   session.pop("chat")
   return redirect(url_for("index"))
 
@@ -132,7 +130,7 @@ def error():
   
   # handle error
   error = parse_status(json.loads(session["error"]))
-  print(f"\n  Error: {error.error_message}\n")
+  logger.info(f"\n  Error: {error.error_message}\n")
 
   
 
@@ -154,7 +152,7 @@ def index():
 if __name__ == "__main__":
   # webbrowser.open('http://127.0.0.1:8000')  # Go to example.com
   # set upload folder
-  print(f"script_dir: {script_dir}")
+  logger.info(f"script_dir: {script_dir}")
 
   app.config["UPLOAD_FOLDER"] = os.path.join(script_dir, UPLOAD_FOLDER_PATH)
   app.config["SESSION_TYPE"] = 'filesystem'
