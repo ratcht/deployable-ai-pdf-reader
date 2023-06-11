@@ -6,8 +6,7 @@ client = datastore.Client(project="ai-chatbot-389511")
 
 
 # init logging
-logging.basicConfig(level=logging.NOTSET)
-handle = "accessdata.py"
+handle = "datastoreapi.py"
 logger = logging.getLogger(handle)
 
 

@@ -1,5 +1,10 @@
 import openai
 import tiktoken
+import logging
+
+handle = "api.py"
+logger = logging.getLogger(handle)
+
 
 def authenticate(API_KEY):
   openai.api_key = API_KEY

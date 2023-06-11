@@ -1,5 +1,4 @@
 from files.python.api import query, num_tokens, create_embedding
-from files.python.params import GPT_MODEL, EMBEDDING_MODEL
 import logging
 import pinecone
 

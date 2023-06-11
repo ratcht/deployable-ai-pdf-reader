@@ -1,9 +1,13 @@
 from PyPDF2 import PdfReader
 import pandas as pd  # for storing text and embeddings data
 from files.python.api import create_embedding
-from files.python.params import EMBEDDING_MODEL
-import ast
+import logging
 import pinecone
+
+
+handle = "datahandler.py"
+logger = logging.getLogger(handle)
+
 
 # read pdf
 def read_pdf(file_path: str) -> list:
