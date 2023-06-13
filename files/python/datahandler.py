@@ -1,7 +1,8 @@
 from PyPDF2 import PdfReader
 import pandas as pd  # for storing text and embeddings data
-from files.python.api import create_embedding
+from files.python.openaiapi import create_embedding
 import logging
+from werkzeug.utils import secure_filename
 import pinecone
 
 
@@ -25,7 +26,7 @@ def read_pdf_from_file(file) -> list:
   return chunks
 
 # process embeddings
-def create_df(chunks: list, title: str, batch_size = 1000) -> pd.DataFrame:
+def create_df(chunks: list, title: str, EMBEDDING_MODEL: str, batch_size = 1000) -> pd.DataFrame:
   embeddings = []
   for batch_start in range(0, len(chunks), batch_size):
     batch_end = batch_start + batch_size
@@ -63,10 +64,11 @@ def upload_to_pinecone(df: pd.DataFrame, pinecone_index: pinecone.Index, batch_s
     batch_ids = batch.index.tolist()
     batch_ids_string = list(map(str, batch_ids))
     batch_titles = batch['title'].tolist()
+
     batch_embeddings = batch['embedding'].tolist()
     batch_text = batch['text'].tolist()
 
-    meta = [{'title':title, 'text': text } for title, text in zip(batch_titles, batch_text)]
+    meta = [{'title':title, 'text': text , 'secured_title':secure_filename(title)} for title, text in zip(batch_titles, batch_text)]
     
     # prep metadata and upsert batch
     to_upsert = zip(batch_ids_string, batch_embeddings, meta)
@@ -74,6 +76,9 @@ def upload_to_pinecone(df: pd.DataFrame, pinecone_index: pinecone.Index, batch_s
     # upsert to Pinecone
     pinecone_index.upsert(vectors=list(to_upsert))
 
+
+def delete_by_title_pinecone(pinecone_index: pinecone.Index, document_title: str):
+  pinecone_index.delete(delete_all=False, filter={"secured_title": document_title})
 
 
 

@@ -48,8 +48,25 @@ def update_config_value(key: str, value:str):
   )
   client.put(entity)
 
+def update_document_list(document_title: str, is_deleting = False):
+  entity = get_config_entity_by_key("UPLOADED_DOCUMENTS")
+  document_list: list = entity['Value']
+  
+  if is_deleting: document_list.remove(document_title)
+  else: document_list.append(document_title)
 
-def get_config_value_by_key(key:str):
+  entity.update(
+    {
+      "Value": document_list
+    }
+  )
+  client.put(entity)
+
+
+def get_config_value(key:str):
+  return get_config_entity_by_key(key)['Value']
+
+def get_config_entity_by_key(key:str):
   keys = client.key("Config", key)
   entity = client.get(key=keys)
   if (entity == None): raise Exception("Datastore: Entity not found in database")

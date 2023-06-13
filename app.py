@@ -1,15 +1,15 @@
 import openai
 from flask import Flask, redirect, url_for, render_template, request, session, after_this_request
-from files.python.api import authenticate
+from werkzeug.utils import secure_filename
+from files.python.openaiapi import authenticate
+from files.python.datastoreapi import get_config_value, update_document_list
 from files.python.datahandler import read_pdf, read_pdf_from_file, create_df, upload_to_pinecone, get_pinecone_index
 from files.python.ask import ask
 from files.python.obj.chat import ChatObj, parse_chat
 from files.python.obj.error import StatusObj, parse_status
 import json
-import pandas as pd
 import os
 import logging
-from werkzeug.utils import secure_filename
 
 class ComplexEncoder(json.JSONEncoder):
   def default(self, obj):
@@ -18,9 +18,17 @@ class ComplexEncoder(json.JSONEncoder):
     else:
       return json.JSONEncoder.default(self, obj)
 
-# configure pinecone_index
+# get all keys
+PINECONE_API_KEY = get_config_value("PINECONE_API_KEY")
+PINECONE_ENVIRONMENT = get_config_value("PINECONE_ENVIRONMENT")
+PINECONE_INDEX = get_config_value("PINECONE_INDEX")
+OPENAI_API_KEY = get_config_value("OPENAI_API_KEY")
 
-pinecone_index = get_pinecone_index(PINECONE_API_KEY, ENVIRONMENT, INDEX)
+ACCEPTED_FILE_TYPES = get_config_value("ACCEPTED_FILE_TYPES").split(',')
+
+
+# configure pinecone_index
+pinecone_index = get_pinecone_index(PINECONE_API_KEY, PINECONE_ENVIRONMENT, PINECONE_INDEX)
 
 # init logging
 logging.basicConfig(level=logging.INFO)
@@ -48,7 +56,7 @@ def upload_file():
   if 'file' not in request.files: redirect(url_for('index'))
 
   file = request.files['file']
-  
+
   # check if file is empty
   if file.filename == '': redirect(url_for('index'))
 
@@ -60,10 +68,9 @@ def upload_file():
   try:
     # embed file and store on pinecone
     chunks = read_pdf_from_file(file)
-    df = create_df(chunks, file.filename)
+    df = create_df(chunks, file.filename, get_config_value("EMBEDDING_MODEL"))
     upload_to_pinecone(df, pinecone_index)
-
-
+    update_document_list(secure_filename(file.filename))
   except (openai.error.APIError, openai.error.InvalidRequestError, openai.error.Timeout) as oe:
     session["error"] = json.dumps(StatusObj(400, f"Something went wrong with the file when passing to OpenAI... {oe}"), cls=ComplexEncoder)
     return redirect(url_for('error'))
@@ -77,8 +84,9 @@ def upload_file():
 @app.route("/upload/list", methods=["GET"])
 def upload_list():
   # display pinecone fetch information
+  document_list = get_config_value("UPLOADED_DOCUMENTS")
   
-  return render_template("list.html", list=list)
+  return render_template("list.html", list=document_list)
 
 
 @app.route("/chat", methods=["POST"])
@@ -86,9 +94,13 @@ def chat():
   # Get chat input
   chat_input = request.get_json()
 
+  parsed_chat = parse_chat(
+    json.loads(session["chat"])
+  )
+
   # Send chat to GPT
   try:
-    chat_response = ask(chat_input, pinecone_index)
+    chat_response = ask(chat_input, pinecone_index, get_config_value("GPT_MODEL"), get_config_value("EMBEDDING_MODEL"), get_config_value("GPT_USER_PROMPT"), parsed_chat)
   except Exception as e:
     session["error"] = json.dumps(StatusObj(500, f"Something happened! Please retry. Exception: {e}"), cls=ComplexEncoder)
     return session["error"]
@@ -96,9 +108,7 @@ def chat():
   chat = ChatObj(chat_input, chat_response)
   
 
-  parsed_chat = parse_chat(
-    json.loads(session["chat"])
-  )
+  
   
   parsed_chat.append(chat)
 
@@ -118,6 +128,24 @@ def clear_chat():
   session.pop("chat")
   return redirect(url_for("index"))
 
+
+@app.route("/admin/verify", methods=["GET", "POST"])
+def admin_verify():
+  if request.method == "GET":
+    if "auth" not in session:
+      session["auth"] = "False"
+    
+    if session["auth"] == "True":
+      return redirect(url_for("admin"))
+    
+    return render_template("verify.html")
+
+  # if post request:
+  # handle password
+    
+@app.route("/admin/panel", methods=["GET", "POST"])
+def admin_panel():
+  pass
 
 
 @app.route("/error", methods=["GET"])
@@ -145,8 +173,20 @@ def index():
   # set session if not set
   if "chat" not in session:
     session['chat'] = '[]' 
+
+  if "auth" not in session:
+    session['auth'] = "False" 
   
   return render_template("index.html")
+
+@app.route("/index-old", methods=["GET"])
+def index_new():
+
+  # set session if not set
+  if "chat" not in session:
+    session['chat'] = '[]' 
+  
+  return render_template("index-old.html")
 
 
 if __name__ == "__main__":
@@ -154,7 +194,6 @@ if __name__ == "__main__":
   # set upload folder
   logger.info(f"script_dir: {script_dir}")
 
-  app.config["UPLOAD_FOLDER"] = os.path.join(script_dir, UPLOAD_FOLDER_PATH)
   app.config["SESSION_TYPE"] = 'filesystem'
 
 

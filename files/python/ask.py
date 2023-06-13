@@ -1,4 +1,4 @@
-from files.python.api import query, num_tokens, create_embedding
+from files.python.openaiapi import query, num_tokens, create_embedding
 import logging
 import pinecone
 
@@ -8,6 +8,7 @@ logger = logging.getLogger(handle)
 def rank_strings_pinecone(
   query: str,
   pinecone_index: pinecone.Index,
+  EMBEDDING_MODEL: str,
   top_n: int = 100
   ):
 
@@ -30,31 +31,34 @@ def rank_strings_pinecone(
   return strings, relatednesses, titles
 
 
-def create_query(query: str, pinecone_index: pinecone.Index, model: str, token_budget: int):
+def create_query(query: str, pinecone_index: pinecone.Index, EMBEDDING_MODEL: str, GPT_MODEL: str, GPT_PROMPT: str, token_budget: int):
   """Return a message for GPT, with relevant source texts pulled from a dataframe."""
-  strings, relatednesses, titles = rank_strings_pinecone(query, pinecone_index, top_n=3)
+  strings, relatednesses, titles = rank_strings_pinecone(query, pinecone_index, EMBEDDING_MODEL, top_n=3)
   logger.info("Finished ranking strings")
 
-  introduction = 'Use the below information, including the title of the document, to answer the subsequent question. Paraphrase and reword the information in the document for clarity, but do not change any facts. Do not give answers that are too long. If the answer cannot be found in the information, write "I could not find an answer."'
+  introduction = GPT_PROMPT
   question = f"\n\nQuestion: {query}"
   message = introduction
-  for string in strings:
-    next_article = f'\n\Document Section:\n"""\n{string}\n"""'
-    if (num_tokens(message + next_article + question, model=model) > token_budget):
+  for string, title in zip(strings, titles):
+    next_article = f'\n\Document Title: {title}. Excerpt:\n"""\n{string}\n"""'
+    if (num_tokens(message + next_article + question, model=GPT_MODEL) > token_budget):
       break
     else:
       message += next_article
   return message + question
 
 
-def ask(prompt: str, pinecone_index: pinecone.Index):
+def ask(prompt: str, pinecone_index: pinecone.Index, GPT_MODEL: str, EMBEDDING_MODEL: str, GPT_PROMPT:str, previous_chat: list = []):
   try:
-    message = create_query(prompt, pinecone_index, model=GPT_MODEL, token_budget=4096-500)
+    message = create_query(prompt, pinecone_index, EMBEDDING_MODEL=EMBEDDING_MODEL, GPT_MODEL=GPT_MODEL, GPT_PROMPT=GPT_PROMPT, token_budget=4096-1000)
   except Exception as e:
     raise Exception(f"From create_query()... {e}")
   
+  # only take the last 3 messages
+  chat_to_send = previous_chat[len(previous_chat)-4:] if (len(previous_chat) > 0) else []
+
   try:
-    response = query(message, GPT_MODEL)
+    response = query(message, chat_to_send, GPT_MODEL)
   except Exception as e:
     raise Exception(f"From query()... {e}")
 

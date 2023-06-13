@@ -1,6 +1,7 @@
 import openai
 import tiktoken
 import logging
+from files.python.obj.chat import ChatObj
 
 handle = "api.py"
 logger = logging.getLogger(handle)
@@ -22,9 +23,19 @@ def create_embedding(embedding_model: str, content):
   return response
 
 
-def query(message: str, model: str):
+def query(message: str, previous_chat: list[ChatObj], model: str):
+
+  chat_to_load = []
+  running_token_count = 0
+  for chatobj in previous_chat:
+    running_token_count += num_tokens(chatobj.prompt+chatobj.response, model)
+    if running_token_count > 1000: break
+    chat_to_load.append({"role": "user", "content": chatobj.prompt})
+    chat_to_load.append({"role": "assistant", "content": chatobj.response})
+
   messages = [
     {"role": "system", "content": "You are skilled at reading and interpreting documents. You will throughly process provided documents and answer detailed questions given the information provided."},
+    *chat_to_load,
     {"role": "user", "content": message},
   ]
 
