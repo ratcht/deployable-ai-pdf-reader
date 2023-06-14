@@ -10,6 +10,7 @@ from files.python.obj.error import StatusObj, parse_status
 import json
 import os
 import logging
+import bcrypt
 
 class ComplexEncoder(json.JSONEncoder):
   def default(self, obj):
@@ -136,16 +137,44 @@ def admin_verify():
       session["auth"] = "False"
     
     if session["auth"] == "True":
-      return redirect(url_for("admin"))
+      return redirect(url_for("admin_panel"))
     
     return render_template("verify.html")
 
-  # if post request:
-  # handle password
+  # if post
+  input_password = request.form['passwordInput']
+  stored_password = get_config_value("ADMIN_PASSWORD")
+
+  
+  
+  # Encode the authenticating password as well</strong> 
+  stored_password = stored_password.encode('utf-8')
+
+  input_password = input_password.encode('utf-8') 
+  
+  # Use conditions to compare the authenticating password with the stored one</strong>:
+  if bcrypt.checkpw(input_password, stored_password):
+    # password matches
+    session["auth"] = "True"
+    return redirect(url_for("admin_panel"))
+  return redirect(url_for("admin_verify", password_wrong = True))
+
+
     
 @app.route("/admin/panel", methods=["GET", "POST"])
 def admin_panel():
-  pass
+  if request.method == "GET":
+    if "auth" not in session:
+      session["auth"] = "False"
+    
+    if session["auth"] == "False":
+      return redirect(url_for("admin_verify"))
+
+    PINECONE_API_KEY = get_config_value("PINECONE_API_KEY")
+    GPT_PROMPT = get_config_value("GPT_USER_PROMPT")
+    OPENAI_API_KEY = get_config_value("OPENAI_API_KEY")
+
+    return render_template("panel.html", pinecone_api = PINECONE_API_KEY, openai_api = OPENAI_API_KEY, gpt_prompt = GPT_PROMPT)
 
 
 @app.route("/error", methods=["GET"])
@@ -198,7 +227,7 @@ if __name__ == "__main__":
 
 
   # run app
-  app.run(port=5000)
+  app.run(port=8000)
 
 
   
