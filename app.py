@@ -2,7 +2,7 @@ import openai
 from flask import Flask, redirect, url_for, render_template, request, session, after_this_request
 from werkzeug.utils import secure_filename
 from files.python.openaiapi import authenticate
-from files.python.datastoreapi import get_config_value, update_document_list
+from files.python.datastoreapi import get_config_value, update_document_list, update_config_value
 from files.python.datahandler import read_pdf, read_pdf_from_file, create_df, upload_to_pinecone, get_pinecone_index
 from files.python.ask import ask
 from files.python.obj.chat import ChatObj, parse_chat
@@ -173,8 +173,18 @@ def admin_panel():
     PINECONE_API_KEY = get_config_value("PINECONE_API_KEY")
     GPT_PROMPT = get_config_value("GPT_USER_PROMPT")
     OPENAI_API_KEY = get_config_value("OPENAI_API_KEY")
-
     return render_template("panel.html", pinecone_api = PINECONE_API_KEY, openai_api = OPENAI_API_KEY, gpt_prompt = GPT_PROMPT)
+
+  gptPrompt = request.form['gptPrompt']
+  pineconeAPI = request.form['pineconeAPI']
+  openaiAPI = request.form['openaiAPI']
+
+  update_config_value("GPT_USER_PROMPT", gptPrompt)
+  update_config_value("PINECONE_API_KEY", pineconeAPI)
+  update_config_value("OPENAI_API_KEY", openaiAPI)
+
+
+
 
 
 @app.route("/error", methods=["GET"])

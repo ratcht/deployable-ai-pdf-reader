@@ -1,6 +1,6 @@
 from PyPDF2 import PdfReader
 import pandas as pd  # for storing text and embeddings data
-from files.python.openaiapi import create_embedding
+from files.python.openaiapi import create_embedding, num_tokens
 import logging
 from werkzeug.utils import secure_filename
 import pinecone
@@ -22,7 +22,8 @@ def read_pdf_from_file(file) -> list:
   reader = PdfReader(file)
   chunks = []
   for page in reader.pages:
-    chunks.append(page.extract_text())
+    excerpt = page.extract_text()
+    chunks.append(excerpt)
   return chunks
 
 # process embeddings
