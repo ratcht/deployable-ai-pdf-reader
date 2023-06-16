@@ -6,9 +6,6 @@ from werkzeug.utils import secure_filename
 import pinecone
 
 
-handle = "datahandler.py"
-logger = logging.getLogger(handle)
-
 
 # read pdf
 def read_pdf(file_path: str) -> list:

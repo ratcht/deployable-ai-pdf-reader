@@ -3,18 +3,20 @@ import tiktoken
 import logging
 from files.python.obj.chat import ChatObj
 
-handle = "api.py"
-logger = logging.getLogger(handle)
-
 
 def authenticate(API_KEY):
+  openai.organization = "org-XWFEL4a6E0JSWS7rklGoJ8Vd" # organization name
   openai.api_key = API_KEY
 
 
 def create_embedding(embedding_model: str, content):
   """Create an embedding"""
 
-  response = openai.Embedding.create(model=embedding_model, input=content)
+  try:
+    response = openai.Embedding.create(model=embedding_model, input=content)
+  except Exception as e:
+    print(e)
+    raise e
 
   
   for i, be in enumerate(response["data"]):

@@ -2,12 +2,6 @@ from google.cloud import datastore
 import logging
 from google.cloud.datastore.query import PropertyFilter
 
-client = datastore.Client(project="ai-chatbot-389511")
-
-
-# init logging
-handle = "datastoreapi.py"
-logger = logging.getLogger(handle)
 
 
 
@@ -27,6 +21,8 @@ def fetch_config_value_by_filter(key: str):
 
 
 def set_config_value(key: str, value:str):
+  client = datastore.Client(project="ai-chatbot-389511")
+
   complete_key = client.key("Config", key)
   entity = datastore.Entity(key=complete_key)
   entity.update(
@@ -38,6 +34,8 @@ def set_config_value(key: str, value:str):
 
 
 def update_config_value(key: str, value:str):
+  client = datastore.Client(project="ai-chatbot-389511")
+
   keys = client.key("Config", key)
   entity = client.get(key=keys)
   if (entity == None): raise Exception("Datastore: Entity not found in database")
@@ -49,6 +47,8 @@ def update_config_value(key: str, value:str):
   client.put(entity)
 
 def update_document_list(document_title: str, is_deleting = False):
+  client = datastore.Client(project="ai-chatbot-389511")
+
   entity = get_config_entity_by_key("UPLOADED_DOCUMENTS")
   document_list: list = entity['Value']
   
@@ -67,6 +67,8 @@ def get_config_value(key:str):
   return get_config_entity_by_key(key)['Value']
 
 def get_config_entity_by_key(key:str):
+  client = datastore.Client(project="ai-chatbot-389511")
+
   keys = client.key("Config", key)
   entity = client.get(key=keys)
   if (entity == None): raise Exception("Datastore: Entity not found in database")

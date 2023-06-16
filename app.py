@@ -7,6 +7,7 @@ from files.python.datahandler import read_pdf, read_pdf_from_file, create_df, up
 from files.python.ask import ask
 from files.python.obj.chat import ChatObj, parse_chat
 from files.python.obj.error import StatusObj, parse_status
+import google.cloud.logging
 import json
 import os
 import logging
@@ -20,25 +21,15 @@ class ComplexEncoder(json.JSONEncoder):
       return json.JSONEncoder.default(self, obj)
 
 # get all keys
-PINECONE_API_KEY = get_config_value("PINECONE_API_KEY")
-PINECONE_ENVIRONMENT = get_config_value("PINECONE_ENVIRONMENT")
-PINECONE_INDEX = get_config_value("PINECONE_INDEX")
-OPENAI_API_KEY = get_config_value("OPENAI_API_KEY")
+
 
 ACCEPTED_FILE_TYPES = get_config_value("ACCEPTED_FILE_TYPES").split(',')
 
 
-# configure pinecone_index
-pinecone_index = get_pinecone_index(PINECONE_API_KEY, PINECONE_ENVIRONMENT, PINECONE_INDEX)
-
-# init logging
-logging.basicConfig(level=logging.INFO)
-handle = "app.py"
-logger = logging.getLogger(handle)
-
 
 script_dir = os.path.dirname(__file__) #<-- absolute dir the script is in
-authenticate(OPENAI_API_KEY)
+
+
 
 app = Flask(__name__)
 app.secret_key = "admin"
@@ -46,8 +37,34 @@ app.secret_key = "admin"
 
 def is_file_allowed(filename):
   file_extension = filename.rsplit('.', 1)[1]
-  logger.info(f"File Extension: {file_extension}")
+  logging.info(f"File Extension: {file_extension}")
   return file_extension in ACCEPTED_FILE_TYPES 
+
+@app.route('/refresh')
+def refresh_vars():
+  logging.warning('Reauthenticating OpenAI...')
+  OPENAI_API_KEY = get_config_value("OPENAI_API_KEY")
+  authenticate(OPENAI_API_KEY)
+
+  return redirect(url_for('index'))
+
+
+@app.route('/warn')
+def warning():
+  logging.warning('Warning page opened...')
+  return '<html><body>Warning Page</body></html>'
+
+@app.route('/test')
+def test():
+  logging.info('Test page opened...')
+  return render_template("test.html")
+
+@app.route('/gcl')
+def setup_cloud_logging():
+  client = google.cloud.logging.Client()
+  client.get_default_handler()
+  client.setup_logging()
+  return '<html><body>Logging was set up</body></html>'
 
 
 @app.route("/upload", methods=["POST"])
@@ -70,7 +87,12 @@ def upload_file():
     # embed file and store on pinecone
     chunks = read_pdf_from_file(file)
     df = create_df(chunks, file.filename, get_config_value("EMBEDDING_MODEL"))
-    upload_to_pinecone(df, pinecone_index)
+
+    PINECONE_API_KEY = get_config_value("PINECONE_API_KEY")
+    PINECONE_ENVIRONMENT = get_config_value("PINECONE_ENVIRONMENT")
+    PINECONE_INDEX = get_config_value("PINECONE_INDEX")
+
+    upload_to_pinecone(df, get_pinecone_index(PINECONE_API_KEY, PINECONE_ENVIRONMENT, PINECONE_INDEX))
     update_document_list(secure_filename(file.filename))
   except (openai.error.APIError, openai.error.InvalidRequestError, openai.error.Timeout) as oe:
     session["error"] = json.dumps(StatusObj(400, f"Something went wrong with the file when passing to OpenAI... {oe}"), cls=ComplexEncoder)
@@ -78,7 +100,7 @@ def upload_file():
   except Exception as e:
     session["error"] = json.dumps(StatusObj(400, f"Something went wrong... {e}"), cls=ComplexEncoder)
   finally:
-    logger.info("After Upload...")
+    logging.info("After Upload...")
     return redirect(url_for('error'))
 
 
@@ -93,6 +115,7 @@ def upload_list():
 @app.route("/chat", methods=["POST"])
 def chat():  
   # Get chat input
+  logging.info("In /chat")
   chat_input = request.get_json()
 
   parsed_chat = parse_chat(
@@ -101,16 +124,15 @@ def chat():
 
   # Send chat to GPT
   try:
-    chat_response = ask(chat_input, pinecone_index, get_config_value("GPT_MODEL"), get_config_value("EMBEDDING_MODEL"), get_config_value("GPT_USER_PROMPT"), parsed_chat)
+    PINECONE_API_KEY = get_config_value("PINECONE_API_KEY")
+    PINECONE_ENVIRONMENT = get_config_value("PINECONE_ENVIRONMENT")
+    PINECONE_INDEX = get_config_value("PINECONE_INDEX")
+    chat_response = ask(chat_input, get_pinecone_index(PINECONE_API_KEY, PINECONE_ENVIRONMENT, PINECONE_INDEX), get_config_value("GPT_MODEL"), get_config_value("EMBEDDING_MODEL"), get_config_value("GPT_USER_PROMPT"), parsed_chat)
   except Exception as e:
     session["error"] = json.dumps(StatusObj(500, f"Something happened! Please retry. Exception: {e}"), cls=ComplexEncoder)
     return session["error"]
 
   chat = ChatObj(chat_input, chat_response)
-  
-
-  
-  
   parsed_chat.append(chat)
 
   session["chat"] = json.dumps(parsed_chat, cls=ComplexEncoder)
@@ -120,12 +142,13 @@ def chat():
 
 @app.route("/chat/list", methods=["GET"])
 def chat_list():
-  logger.info(f'Chat: {session["chat"]}')
+  logging.info(f'Chat: {session["chat"]}')
   return render_template("partials/chat-partial.html", loaded_chat=parse_chat(json.loads(session["chat"])))
+
 
 @app.route("/chat/clear", methods=["GET"])
 def clear_chat():
-  logger.info("Chat cleared!")
+  logging.info("Chat cleared!")
   session.pop("chat")
   return redirect(url_for("index"))
 
@@ -144,8 +167,6 @@ def admin_verify():
   # if post
   input_password = request.form['passwordInput']
   stored_password = get_config_value("ADMIN_PASSWORD")
-
-  
   
   # Encode the authenticating password as well</strong> 
   stored_password = stored_password.encode('utf-8')
@@ -158,7 +179,6 @@ def admin_verify():
     session["auth"] = "True"
     return redirect(url_for("admin_panel"))
   return redirect(url_for("admin_verify", password_wrong = True))
-
 
     
 @app.route("/admin/panel", methods=["GET", "POST"])
@@ -197,7 +217,8 @@ def error():
   
   # handle error
   error = parse_status(json.loads(session["error"]))
-  logger.info(f"\n  Error: {error.error_message}\n")
+  print(f"\n  Error: {error.error_message}\n")
+  logging.info(f"\n  Error: {error.error_message}\n")
 
   
 
@@ -215,12 +236,14 @@ def index():
 
   if "auth" not in session:
     session['auth'] = "False" 
+
+  logging.info("In Index Page")
   
   return render_template("index.html")
 
 @app.route("/index-old", methods=["GET"])
 def index_new():
-
+  
   # set session if not set
   if "chat" not in session:
     session['chat'] = '[]' 
@@ -231,13 +254,16 @@ def index_new():
 if __name__ == "__main__":
   # webbrowser.open('http://127.0.0.1:8000')  # Go to example.com
   # set upload folder
-  logger.info(f"script_dir: {script_dir}")
+  logging.info(f"script_dir: {script_dir}")
 
   app.config["SESSION_TYPE"] = 'filesystem'
 
+  # authenticate
+  OPENAI_API_KEY = get_config_value("OPENAI_API_KEY")
+  authenticate(OPENAI_API_KEY)
 
   # run app
-  app.run(port=8000)
+  app.run(port=8000, debug=True)
 
 
   

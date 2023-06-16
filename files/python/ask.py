@@ -2,9 +2,6 @@ from files.python.openaiapi import query, num_tokens, create_embedding
 import logging
 import pinecone
 
-handle = "ask.py"
-logger = logging.getLogger(handle)
-
 def rank_strings_pinecone(
   query: str,
   pinecone_index: pinecone.Index,
@@ -12,13 +9,17 @@ def rank_strings_pinecone(
   top_n: int = 100
   ):
 
+
   query_embedding_response = create_embedding(
     EMBEDDING_MODEL,
     query
   )
+
   query_embedding = query_embedding_response["data"][0]["embedding"]
+  print("Created Embedding")
 
   pinecone_res = pinecone_index.query(query_embedding, top_k=top_n, include_metadata=True)
+  print("Indexed Pinecone")
 
   strings = []
   relatednesses = []
@@ -34,7 +35,8 @@ def rank_strings_pinecone(
 def create_query(query: str, pinecone_index: pinecone.Index, EMBEDDING_MODEL: str, GPT_MODEL: str, GPT_PROMPT: str, token_budget: int):
   """Return a message for GPT, with relevant source texts pulled from a dataframe."""
   strings, relatednesses, titles = rank_strings_pinecone(query, pinecone_index, EMBEDDING_MODEL, top_n=3)
-  logger.info("Finished ranking strings")
+  print("Finished ranking strings")
+  logging.info("Finished ranking strings")
 
   introduction = GPT_PROMPT
   question = f"\n\nQuestion: {query}"
