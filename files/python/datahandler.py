@@ -48,7 +48,10 @@ def get_pinecone_index(API_KEY, ENVIRONMENT, INDEX) -> pinecone.Index:
   )
   index = pinecone.Index(INDEX)
   return index
+
   
+def get_starting_id(pinecone_index: pinecone.Index):
+  return pinecone_index.describe_index_stats()['total_vector_count']
 
 
 def upload_to_pinecone(df: pd.DataFrame, pinecone_index: pinecone.Index, batch_size: int = 32):
@@ -59,14 +62,16 @@ def upload_to_pinecone(df: pd.DataFrame, pinecone_index: pinecone.Index, batch_s
     print(f"Batch {batch_start} to {batch_end-1}")
 
     batch = df[batch_start:batch_end]
-    batch_ids = batch.index.tolist()
-    batch_ids_string = list(map(str, batch_ids))
+
     batch_titles = batch['title'].tolist()
 
+    startingID = get_starting_id(pinecone_index)
+    batch_ids = [i+startingID for i in range(0,len(batch_titles))]
+    batch_ids_string = list(map(str, batch_ids))
     batch_embeddings = batch['embedding'].tolist()
     batch_text = batch['text'].tolist()
 
-    meta = [{'title':title, 'text': text , 'secured_title':secure_filename(title)} for title, text in zip(batch_titles, batch_text)]
+    meta = [{'title':title, 'text': text } for title, text in zip(batch_titles, batch_text)]
     
     # prep metadata and upsert batch
     to_upsert = zip(batch_ids_string, batch_embeddings, meta)

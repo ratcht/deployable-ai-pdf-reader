@@ -29,6 +29,10 @@ ACCEPTED_FILE_TYPES = get_config_value("ACCEPTED_FILE_TYPES").split(',')
 
 script_dir = os.path.dirname(__file__) #<-- absolute dir the script is in
 
+# authenticate
+OPENAI_API_KEY = get_config_value("OPENAI_API_KEY")
+authenticate(OPENAI_API_KEY)
+
 
 
 app = Flask(__name__)
@@ -258,9 +262,6 @@ if __name__ == "__main__":
 
   app.config["SESSION_TYPE"] = 'filesystem'
 
-  # authenticate
-  OPENAI_API_KEY = get_config_value("OPENAI_API_KEY")
-  authenticate(OPENAI_API_KEY)
 
   # run app
   app.run(port=8000, debug=True)

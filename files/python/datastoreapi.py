@@ -21,7 +21,7 @@ def fetch_config_value_by_filter(key: str):
 
 
 def set_config_value(key: str, value:str):
-  client = datastore.Client(project="ai-chatbot-389511")
+  client = datastore.Client(project="ivory-airfoil-389421")
 
   complete_key = client.key("Config", key)
   entity = datastore.Entity(key=complete_key)
@@ -34,7 +34,7 @@ def set_config_value(key: str, value:str):
 
 
 def update_config_value(key: str, value:str):
-  client = datastore.Client(project="ai-chatbot-389511")
+  client = datastore.Client(project="ivory-airfoil-389421")
 
   keys = client.key("Config", key)
   entity = client.get(key=keys)
@@ -47,7 +47,7 @@ def update_config_value(key: str, value:str):
   client.put(entity)
 
 def update_document_list(document_title: str, is_deleting = False):
-  client = datastore.Client(project="ai-chatbot-389511")
+  client = datastore.Client(project="ivory-airfoil-389421")
 
   entity = get_config_entity_by_key("UPLOADED_DOCUMENTS")
   document_list: list = entity['Value']
@@ -67,7 +67,7 @@ def get_config_value(key:str):
   return get_config_entity_by_key(key)['Value']
 
 def get_config_entity_by_key(key:str):
-  client = datastore.Client(project="ai-chatbot-389511")
+  client = datastore.Client(project="ivory-airfoil-389421")
 
   keys = client.key("Config", key)
   entity = client.get(key=keys)
